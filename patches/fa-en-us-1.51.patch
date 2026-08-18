@@ -1,0 +1,18 @@
+diff --git a/src/libespeak-ng/translate.c b/src/libespeak-ng/translate.c
+index 0914619..bd95b40 100644
+--- a/src/libespeak-ng/translate.c
++++ b/src/libespeak-ng/translate.c
+@@ -1435,6 +1435,13 @@ static int TranslateWord2(Translator *tr, char *word, WORD_TAB *wtab, int pre_pa
+ 				if (new_language[0] == 0)
+ 					new_language = ESPEAKNG_DEFAULT_VOICE;
+ 
++				// Persian (fa): force English fallback to American English (en-us)
++				if (translator != NULL && translator->translator_name == L('f', 'a') &&
++				    (strcmp(new_language, "en") == 0 || strcmp(new_language, "EN") == 0 ||
++				     strcmp(new_language, "en-gb") == 0 || strcmp(new_language, "en-GB") == 0)) {
++					new_language = "en-us";
++				}
++
+ 				switch_phonemes = SetTranslator2(new_language);
+ 
+ 				if (switch_phonemes >= 0) {
