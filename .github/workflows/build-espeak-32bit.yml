@@ -15,74 +15,94 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v4
 
-      - name: Clone eSpeak NG 1.51
-        shell: bash
-        run: |
-          git clone --branch 1.51 --depth 1 https://github.com/espeak-ng/espeak-ng.git espeak-ng
-          cd espeak-ng
-          git log -1 --oneline
-
-      - name: Apply Persian → en-us patch
-        shell: bash
-        run: |
-          cd espeak-ng
-          patch -p1 < ../patches/fa-en-us-1.51.patch
-          echo "=== Patch applied ==="
-          grep -n "en-us\|Persian" src/libespeak-ng/translate.c
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Build with MSBuild (Win32)
-        working-directory: espeak-ng/src/windows
-        run: |
-          msbuild espeak-ng.sln /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
-        continue-on-error: true
-
-      - name: Setup MSYS2 MinGW32 (fallback)
+      - name: Setup MSYS2 MinGW32
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW32
           update: true
-          install: mingw-w64-i686-gcc mingw-w64-i686-cmake mingw-w64-i686-ninja git make
+          install: >-
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            git
+            make
+            python
 
-      - name: Build with MinGW (fallback)
+      - name: Clone eSpeak NG (modern, CMake)
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 https://github.com/espeak-ng/espeak-ng.git espeak-ng
+          cd espeak-ng
+          git log -1 --oneline
+
+      - name: Apply Persian to en-us patch
         shell: msys2 {0}
         run: |
           cd espeak-ng
-          mkdir -p build32 && cd build32
-          SRC=../src/libespeak-ng
-          i686-w64-mingw32-gcc -shared -O2 -s \
-            -DWIN32 -D_WIN32 -DPLATFORM_WINDOWS -DHAVE_STDINT_H \
-            -I../src/include -I../src/libespeak-ng \
-            -o espeak.dll \
-            $SRC/compiledata.c $SRC/compiledict.c $SRC/dictionary.c \
-            $SRC/encoding.c $SRC/error.c $SRC/espeak_api.c \
-            $SRC/ieee80.c $SRC/intonation.c $SRC/klatt.c \
-            $SRC/numbers.c $SRC/phoneme.c $SRC/phonemelist.c \
-            $SRC/readclause.c $SRC/setlengths.c $SRC/soundicon.c \
-            $SRC/spect.c $SRC/speech.c $SRC/ssml.c \
-            $SRC/synthdata.c $SRC/synthesize.c $SRC/tr_languages.c \
-            $SRC/translate.c $SRC/translateword.c $SRC/voices.c \
-            $SRC/wavegen.c \
-            -lwinmm 2>&1 || true
-          ls -la espeak.dll || ls -la *.dll || find . -name "*.dll"
+          python - << 'PY'
+          with open("src/libespeak-ng/translate.c", "r", encoding="utf-8", errors="ignore") as f:
+              content = f.read()
+
+          markers = [
+              ('''\t\t\t\tconst char *new_language;\n\t\t\t\tnew_language = (char *)(&p[1]);\n\t\t\t\tif (new_language[0] == 0)\n\t\t\t\t\tnew_language = ESPEAKNG_DEFAULT_VOICE;\n\n\t\t\t\tswitch_phonemes = SetTranslator2(new_language);''',
+               '''\t\t\t\tconst char *new_language;\n\t\t\t\tnew_language = (char *)(&p[1]);\n\t\t\t\tif (new_language[0] == 0)\n\t\t\t\t\tnew_language = ESPEAKNG_DEFAULT_VOICE;\n\n\t\t\t\t// Persian (fa): force English fallback to American English (en-us)\n\t\t\t\tif (translator != NULL && translator->translator_name == L('f', 'a') &&\n\t\t\t\t    (strcmp(new_language, "en") == 0 || strcmp(new_language, "EN") == 0 ||\n\t\t\t\t     strcmp(new_language, "en-gb") == 0 || strcmp(new_language, "en-GB") == 0)) {\n\t\t\t\t\tnew_language = "en-us";\n\t\t\t\t}\n\n\t\t\t\tswitch_phonemes = SetTranslator2(new_language);'''),
+              ('''\t\t\t\tnew_language = (char *)(&p[1]);\n\t\t\t\tif (new_language[0] == 0)\n\t\t\t\t\tnew_language = ESPEAKNG_DEFAULT_VOICE;\n\n\t\t\t\tswitch_phonemes = SetTranslator2(new_language);''',
+               '''\t\t\t\tnew_language = (char *)(&p[1]);\n\t\t\t\tif (new_language[0] == 0)\n\t\t\t\t\tnew_language = ESPEAKNG_DEFAULT_VOICE;\n\n\t\t\t\t// Persian (fa): force English fallback to American English (en-us)\n\t\t\t\tif (translator != NULL && translator->translator_name == L('f', 'a') &&\n\t\t\t\t    (strcmp(new_language, "en") == 0 || strcmp(new_language, "EN") == 0 ||\n\t\t\t\t     strcmp(new_language, "en-gb") == 0 || strcmp(new_language, "en-GB") == 0)) {\n\t\t\t\t\tnew_language = "en-us";\n\t\t\t\t}\n\n\t\t\t\tswitch_phonemes = SetTranslator2(new_language);'''),
+          ]
+
+          applied = False
+          for old, new in markers:
+              if old in content:
+                  content = content.replace(old, new)
+                  applied = True
+                  print("Patch applied")
+                  break
+
+          if not applied:
+              print("WARNING: pattern not found")
+              idx = content.find("SetTranslator2(new_language)")
+              print(repr(content[max(0,idx-250):idx+50]) if idx > 0 else "not found")
+          else:
+              with open("src/libespeak-ng/translate.c", "w", encoding="utf-8") as f:
+                  f.write(content)
+          PY
+          grep -n "en-us\|Persian" src/libespeak-ng/translate.c || true
+
+      - name: Configure CMake 32-bit
+        shell: msys2 {0}
+        run: |
+          cd espeak-ng
+          mkdir -p build32
+          cd build32
+          cmake .. \
+            -G Ninja \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_C_COMPILER=i686-w64-mingw32-gcc \
+            -DCMAKE_CXX_COMPILER=i686-w64-mingw32-g++ \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DUSE_SPEECHPLAYER=OFF \
+            -DUSE_LIBSONIC=OFF \
+            -DUSE_LIBPCAUDIO=OFF \
+            -DUSE_ASYNC=OFF
+
+      - name: Build DLL
+        shell: msys2 {0}
+        run: |
+          cd espeak-ng/build32
+          cmake --build . --target espeak-ng -j$(nproc)
+          ls -la src/libespeak-ng.dll || ls -la *.dll || find . -name "*.dll"
 
       - name: Prepare artifact
-        shell: bash
+        shell: msys2 {0}
         run: |
           mkdir -p artifact
-          if [ -f espeak-ng/src/windows/Release/espeak-ng.dll ]; then
-            cp espeak-ng/src/windows/Release/espeak-ng.dll artifact/espeak.dll
-          elif [ -f espeak-ng/src/windows/Win32/Release/espeak-ng.dll ]; then
-            cp espeak-ng/src/windows/Win32/Release/espeak-ng.dll artifact/espeak.dll
-          elif [ -f espeak-ng/src/windows/Release/libespeak-ng.dll ]; then
-            cp espeak-ng/src/windows/Release/libespeak-ng.dll artifact/espeak.dll
-          elif [ -f espeak-ng/build32/espeak.dll ]; then
-            cp espeak-ng/build32/espeak.dll artifact/espeak.dll
+          if [ -f espeak-ng/build32/src/libespeak-ng.dll ]; then
+            cp espeak-ng/build32/src/libespeak-ng.dll artifact/espeak.dll
+          elif [ -f espeak-ng/build32/libespeak-ng.dll ]; then
+            cp espeak-ng/build32/libespeak-ng.dll artifact/espeak.dll
           else
-            echo "Searching for any DLL..."
-            find espeak-ng -name "*.dll" | head -20
+            find espeak-ng -name "*.dll"
             exit 1
           fi
           ls -la artifact/
@@ -90,6 +110,6 @@ jobs:
       - name: Upload 32-bit DLL
         uses: actions/upload-artifact@v4
         with:
-          name: espeak-ng-32bit-fa-en-us-1.51
+          name: espeak-ng-32bit-fa-en-us
           path: artifact/espeak.dll
           retention-days: 30
