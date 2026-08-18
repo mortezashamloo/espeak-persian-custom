@@ -1,0 +1,95 @@
+name: Build eSpeak NG 32-bit (fa → en-us)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-espeak-32bit.yml'
+      - 'patches/**'
+
+jobs:
+  build-win32:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Clone eSpeak NG 1.51
+        shell: bash
+        run: |
+          git clone --branch 1.51 --depth 1 https://github.com/espeak-ng/espeak-ng.git espeak-ng
+          cd espeak-ng
+          git log -1 --oneline
+
+      - name: Apply Persian → en-us patch
+        shell: bash
+        run: |
+          cd espeak-ng
+          patch -p1 < ../patches/fa-en-us-1.51.patch
+          echo "=== Patch applied ==="
+          grep -n "en-us\|Persian" src/libespeak-ng/translate.c
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build with MSBuild (Win32)
+        working-directory: espeak-ng/src/windows
+        run: |
+          msbuild espeak-ng.sln /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
+        continue-on-error: true
+
+      - name: Setup MSYS2 MinGW32 (fallback)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: mingw-w64-i686-gcc mingw-w64-i686-cmake mingw-w64-i686-ninja git make
+
+      - name: Build with MinGW (fallback)
+        shell: msys2 {0}
+        run: |
+          cd espeak-ng
+          mkdir -p build32 && cd build32
+          SRC=../src/libespeak-ng
+          i686-w64-mingw32-gcc -shared -O2 -s \
+            -DWIN32 -D_WIN32 -DPLATFORM_WINDOWS -DHAVE_STDINT_H \
+            -I../src/include -I../src/libespeak-ng \
+            -o espeak.dll \
+            $SRC/compiledata.c $SRC/compiledict.c $SRC/dictionary.c \
+            $SRC/encoding.c $SRC/error.c $SRC/espeak_api.c \
+            $SRC/ieee80.c $SRC/intonation.c $SRC/klatt.c \
+            $SRC/numbers.c $SRC/phoneme.c $SRC/phonemelist.c \
+            $SRC/readclause.c $SRC/setlengths.c $SRC/soundicon.c \
+            $SRC/spect.c $SRC/speech.c $SRC/ssml.c \
+            $SRC/synthdata.c $SRC/synthesize.c $SRC/tr_languages.c \
+            $SRC/translate.c $SRC/translateword.c $SRC/voices.c \
+            $SRC/wavegen.c \
+            -lwinmm 2>&1 || true
+          ls -la espeak.dll || ls -la *.dll || find . -name "*.dll"
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p artifact
+          if [ -f espeak-ng/src/windows/Release/espeak-ng.dll ]; then
+            cp espeak-ng/src/windows/Release/espeak-ng.dll artifact/espeak.dll
+          elif [ -f espeak-ng/src/windows/Win32/Release/espeak-ng.dll ]; then
+            cp espeak-ng/src/windows/Win32/Release/espeak-ng.dll artifact/espeak.dll
+          elif [ -f espeak-ng/src/windows/Release/libespeak-ng.dll ]; then
+            cp espeak-ng/src/windows/Release/libespeak-ng.dll artifact/espeak.dll
+          elif [ -f espeak-ng/build32/espeak.dll ]; then
+            cp espeak-ng/build32/espeak.dll artifact/espeak.dll
+          else
+            echo "Searching for any DLL..."
+            find espeak-ng -name "*.dll" | head -20
+            exit 1
+          fi
+          ls -la artifact/
+
+      - name: Upload 32-bit DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: espeak-ng-32bit-fa-en-us-1.51
+          path: artifact/espeak.dll
+          retention-days: 30
