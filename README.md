@@ -1,55 +1,35 @@
-# eSpeak 1.48.15 – Persian Custom Build
+# eSpeak Persian Custom
 
-این یک نسخهٔ شخصی‌سازی‌شده از eSpeak کلاسیک (1.48.15) است و نسخهٔ رسمی eSpeak یا eSpeak NG محسوب نمی‌شود.
+پچ و بیلد شخصی‌سازی‌شده برای استفاده بهتر از eSpeak / eSpeak NG با زبان فارسی.
 
-نویسندهٔ این پچ/بسته: **[مرتضی شاملو]**
+## بیلد ۳۲بیتی eSpeak NG 1.51 (با پچ fa → en-us)
 
-## این بسته چیست؟
+این ریپو یک GitHub Actions دارد که نسخهٔ ۳۲بیتی eSpeak NG 1.51 را با پچ زیر می‌سازد:
 
-بر پایهٔ eSpeak 1.48.15 ساخته شده و برای استفادهٔ بهتر با زبان فارسی (مخصوصاً همراه با صفحه‌خوان‌هایی مثل JAWS که از SAPI5 استفاده می‌کنند) شخصی‌سازی شده است.
+- وقتی زبان فعلی فارسی باشد، کلمات انگلیسی با لهجهٔ **آمریکایی (en-us)** خوانده می‌شوند (به جای بریتیش).
 
-### تغییرات و بهبودها
-- به‌روزرسانی دیکشنری فارسی با داده‌های جدیدتر
-- اصلاح تلفظ بعضی کلمات و نام‌ها
-- بهبود خواندن بعضی علامت‌ها (مثل ؟ % $ * و ...)
-- بهبود رفتار خواندن اعداد منفی
-- حفظ پشتیبانی SAPI5 برای ویندوز
-- نصب‌کنندهٔ اختصاصی برای نصب ساده‌تر فایل‌های شخصی‌سازی‌شده
+### نحوه اجرا
 
-## مهم
-- این پروژه رسمی نیست.
-- وابسته به eSpeak اصلی است و تحت مجوز GPL منتشر می‌شود.
-- اگر مشکلی دیدید، به نسخه‌های رسمی eSpeak / eSpeak NG گزارش دهید؛ این بسته یک پچ شخصی است.
+1. برو به تب **Actions** در همین ریپو:
+   https://github.com/mortezashamloo/espeak-persian-custom/actions
 
-## نصب (ویندوز)
-1. فایل نصب‌کننده (exe) را اجرا کنید.
-2. در صورت نیاز صدا/زبان‌های مورد نظر را انتخاب کنید.
-3. پس از نصب، در تنظیمات صفحه‌خوان (مثل JAWS) صدای eSpeak را انتخاب کنید.
+2. workflow به نام **Build eSpeak NG 32-bit (fa → en-us)** را انتخاب کن.
 
-## فایل‌ها
-- نصب‌کنندهٔ ویندوز (exe)
-- در صورت موجود بودن: نسخهٔ اندروید (apk)
-- سورس/فایل‌های مرتبط با دیکشنری و پچ فارسی
+3. روی **Run workflow** کلیک کن.
 
-## سلب مسئولیت
-این بسته همان‌طور که هست ارائه می‌شود. مسئولیتی در قبال مشکلات احتمالی سازگاری یا از بین رفتن داده‌ها پذیرفته نمی‌شود. قبل از نصب از تنظیمات مهم خود پشتیبان بگیرید.
-## english
-# eSpeak 1.48.15 – Persian Custom Build
+4. بعد از اتمام بیلد، در بخش **Artifacts** فایل `espeak-ng-32bit-fa-en-us-1.51` را دانلود کن.
 
-This is an unofficial, personalized build based on classic eSpeak 1.48.15.
-It is NOT an official eSpeak or eSpeak NG release.
+5. فایل `espeak.dll` داخل آن را در مسیر زیر کپی کن:
+   ```
+   C:\Program Files (x86)\NVDA\synthDrivers\espeak.dll
+   ```
 
-Custom patch/package by: **[morteza shamloo]**
+### پچ
 
-### What changed
-- Improved Persian dictionary data
-- Better pronunciation for some words and names
-- Improved handling of some symbols
-- Better negative number reading
-- SAPI5 support kept for Windows screen readers (e.g. JAWS)
-- Custom installer to make setup easier
+فایل پچ در مسیر `patches/fa-en-us-1.51.patch` قرار دارد.
 
-### Note
-This is a personal patch, not an official project.
-It remains under the GPL license of eSpeak.
-Use at your own risk and keep backups before installing.
+---
+
+## نسخهٔ کلاسیک eSpeak 1.48.15 (قبلی)
+
+این ریپو در ابتدا برای نسخهٔ کلاسیک eSpeak 1.48.15 با بهبودهای فارسی ساخته شده بود.
